@@ -1,6 +1,6 @@
+import threading
 import time
 import tkinter as tk
-from threading import Thread
 
 from seleniumwire import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -26,10 +26,12 @@ def updateCategoryInfo():
                 for i in range(categories.__len__()):
                     nameCategory += categories.__getitem__(i).text + ' / '
                 try:
-                    txtEdit.insert(tk.END, f'Открыта страница "{ctalogTitle}" в категории "{nameCategory}"')
-                    txtEdit.insert(tk.END, f'В категории найдено {newCountBrands} брендов')
+                    txtEdit.insert(tk.END, f'Открыта страница "{ctalogTitle}" в категории "{nameCategory} \n"')
+                    txtEdit.insert(tk.END, f'В категории найдено {newCountBrands} брендов \n')
                 except Exception:
-                    txtEdit.insert(tk.END, 'Ошибка: Не удалось получить информацию о выбранной категории')
+                    txtEdit.insert(tk.END, 'Ошибка: Не удалось получить информацию о выбранной категории \n')
+
+
         except:
             pass
 
@@ -39,13 +41,17 @@ def start():
     #            '%3FreturnUrl%3Dhttps%253A%252F%252Fwww.wildberries.ru%252F')
     driver.get('https://www.wildberries.ru/catalog/krasota/aksessuary/aksessuary-dlya-makiyazha')
     txtEdit.insert(tk.END, 'Шаг 2: Выберите категорию товаров \n')
-    thread = Thread(target=updateCategoryInfo()).start()
+    thread = threading.Thread(target=updateCategoryInfo).start()
+
+def send():
+
 
 message = 'Здравствуйте! Мы компания, которая предоставляет услуги в сфере фулфилмента. Мы предложим Вам самую лучшую ' \
           'цену на рынке! Если Вы заинтересованы, напишите обратное сообщение на номер WhatsApp: +7 977 447-88-22. ' \
           'Если Вы дадите обратную связь в течение 3-х дней, мы предоставим Вам дополнительную СКИДКУ в размере 10%. ' \
           'Спасибо за внимание! '
-driver = webdriver.Chrome(service=Service("C:\\Users\\Информационный\\Downloads\\chromedriver.exe"))
+# driver = webdriver.Chrome(service=Service("C:\\Users\\Информационный\\Downloads\\chromedriver.exe"))
+driver = webdriver.Chrome(service=Service("C:\\Users\\Teacher_34\\Downloads\\chromedriver.exe"));
 driver.maximize_window()
 
 window = tk.Tk()
@@ -59,7 +65,7 @@ txtEdit = tk.Text(window, wrap=tk.CHAR)
 scroll = tk.Scrollbar(command=txtEdit.yview)
 frameButtons = tk.Frame(window)
 btnStart = tk.Button(frameButtons, text="Начать работу", command=start)
-btnSend = tk.Button(frameButtons, text="Начать рассылку")
+btnSend = tk.Button(frameButtons, text="Начать рассылку", command=send)
 
 btnStart.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
 btnSend.grid(row=1, column=0, sticky="ew", padx=5)
