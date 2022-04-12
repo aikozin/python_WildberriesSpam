@@ -2,6 +2,8 @@ import threading
 import time
 import tkinter as tk
 
+import requests
+from selenium.webdriver import Keys
 from seleniumwire import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -9,11 +11,15 @@ import json
 
 
 search = True
+oldEvent = ''
 newEvent = ''
+userAgent = ''
 
 
 def asyncUpdateCategoryInfo():
     oldCountBrands = 0
+    global userAgent
+    global search
     while search:
         time.sleep(0.5)
         try:
@@ -23,6 +29,8 @@ def asyncUpdateCategoryInfo():
                     jsonObject = json.loads(item.response.body)
                     global requestsJson
                     requestsJson = jsonObject['data']['filters'][1]['items']
+                    userAgent = item.headers.get('user-agent')
+
                     newCountBrands = len(requestsJson)
             if oldCountBrands != newCountBrands:
                 oldCountBrands = newCountBrands
@@ -34,6 +42,7 @@ def asyncUpdateCategoryInfo():
                 try:
                     txtEdit.insert(tk.END, f'Открыта страница "{catalogTitle}" в категории "{nameCategory}" \n')
                     txtEdit.insert(tk.END, f'В категории найдено {newCountBrands} брендов \n\n')
+                    txtEdit.insert(tk.END, userAgent)
                 except Exception:
                     txtEdit.insert(tk.END, 'Ошибка: Не удалось получить информацию о выбранной категории \n')
         except:
@@ -42,9 +51,9 @@ def asyncUpdateCategoryInfo():
 
 def start():
     txtEdit.insert(tk.END, 'Шаг 1: Войдите в учетную запись в открывшемся окне браузера Chrome \n\n')
-    # driver.get('https://www.wildberries.ru/security/login?returnUrl=https%3A%2F%2Fwww.wildberries.ru%2Fsecurity%2Flogin'
-    #            '%3FreturnUrl%3Dhttps%253A%252F%252Fwww.wildberries.ru%252F')
-    driver.get('https://www.wildberries.ru/catalog/krasota/aksessuary/aksessuary-dlya-makiyazha')
+    driver.get('https://www.wildberries.ru/security/login?returnUrl=https%3A%2F%2Fwww.wildberries.ru%2Fsecurity%2Flogin'
+        '%3FreturnUrl%3Dhttps%253A%252F%252Fwww.wildberries.ru%252F')
+    # driver.get('https://www.wildberries.ru/catalog/krasota/aksessuary/aksessuary-dlya-makiyazha')
     txtEdit.insert(tk.END, 'Шаг 2: Выберите категорию товаров \n\n')
     thread1 = threading.Thread(target=asyncUpdateCategoryInfo)
     thread1.start()
@@ -55,33 +64,66 @@ def asyncSendMessages():
     global newEvent
     brand = driver.find_element(By.XPATH, '//*[@id="filters"]/div[2]/div[2]/fieldset/label[1]')
     for i in range(0, len(requestsJson)):
-        txtEdit.insert(tk.END, f'Пишем бренду {requestsJson[i]["name"]} \n')
+        txtEdit.insert(tk.END, f'Бренд {i + 1} из {len(requestsJson)}')
+        txtEdit.insert(tk.END, f'Пишем бренду {requestsJson[i]["name"]}... ')
         driver.execute_script("arguments[0].setAttribute('data-value', '" + str(requestsJson[i]['id']) + "')", brand)
         driver.execute_script("arguments[0].textContent='" + requestsJson[i]['name'] + "'", brand)
         brand.click()
-        while newEvent == oldEvent:
-            for item in driver.requests:
-                if 'https://www.wildberries.ru/stats/events' in item.url:
-                    newEvent = item.__getattribute__('date')
-        oldEvent = newEvent
-        txtEdit.insert(tk.END, 'Написали')
+        waitEvent()
+
+        driver.execute_script('window.open("' + driver.find_element(By.XPATH, '//div[@class="product-card-list"]/div[1]/div/a').get_attribute('href') + '#Comments' + '", "new_window")')
+        waitEvent()
+        driver.switch_to.window(driver.window_handles[1])
+        driver.find_element(By.XPATH, '//*[@id="a-Questions"]').click()
+        time.sleep(0.5)
+        driver.find_element(By.XPATH, '//*[@id="new-question"]').click()
+        driver.find_element(By.XPATH, '//*[@id="new-question"]').send_keys(message)
+        time.sleep(1)
+        driver.find_element(By.XPATH, '//*[@id="addComment"]').click()
+
+        # нажатие на "Отправить"
+        popups = ''
+        while popups.find('Спасибо за Ваш вопрос') == -1:
+            popups = driver.find_elements(By.XPATH, '//h2[@class="popup__header"]')
+
+        driver.close()
+        driver.switch_to.window(driver.window_handles[0])
+
+        txtEdit.insert(tk.END, 'Готово \n')
         brand.click()
-        while newEvent == oldEvent:
-            for item in driver.requests:
-                if 'https://www.wildberries.ru/stats/events' in item.url:
-                    newEvent = item.__getattribute__('date')
-        oldEvent = newEvent
+        waitEvent()
 
 
 def send():
-    search = False
+    global userAgent
+    global search
     global oldEvent
     global newEvent
+    search = False
     for item in driver.requests:
         if 'https://www.wildberries.ru/stats/events' in item.url:
             oldEvent = item.__getattribute__('date')
     newEvent = oldEvent
-    thread2 = threading.Thread(target=asyncSendMessages).start()
+    # thread2 = threading.Thread(target=asyncSendMessages).start()
+
+    url = 'https://questions.wildberries.ru/api/v1/question'
+    headers = {
+        'User-Agent': userAgent,
+        'authorization': 'Bearer ' + 'eyJhbGciOiJSUzI1NiIsImtpZCI6IlpkZUJNOG5xb0RCd3N4RkdnMjM5a1N4N1pZY2xncTZNWjVPSXVVRGdiSXciLCJ0eXAiOiJKV1QifQ.eyJleHAiOjE2NDk4NzMyMjEsImlhdCI6MTY0OTc4NjgyMSwicm9sZXMiOlsidXNlciJdLCJ1c2VyX2lkIjo1Mzk4NTM2N30.AUcxXvejd8J9WemfrucYKno0lO-fbYfKwPNgpbl4K06q_auvzIwaZy_HRhgrfpUhglHbllKGMj9oKsb_uwOIzdxpgE9_DxiMHOZVh4MYL69UKxx31W2bObFFmvZeC_i-1tSRMszsxQFWUM9eASj1jxW59UwF13dMZAH9y7jBRbijOncr2ZagL47b4gTqjlRN1Dg_inAGyDCtqKfAqDD0ZdmcSWaeP0RzkYQdnJH8b3Uqv62ICmIyiSkYROlFIhkXmP8T55KNVBDTYa_9rmpIbBOYjD3enUnuXYQArjnY5EhUDH5r0oaeaJ7Z-wvlbgvGvHEkkh-ZH6dceAaNEUpvkA'}
+    response = requests.post(url,
+                             headers=headers,
+                             json={'imtId':40651286,'text':message,'goodsName':'Смартфон iPhone 11 64GB (новая комплектация)'})
+    txtEdit.insert(tk.END, response.status_code)
+
+
+def waitEvent():
+    global oldEvent
+    global newEvent
+    while newEvent == oldEvent:
+        for item in driver.requests:
+            if 'https://www.wildberries.ru/stats/events' in item.url:
+                newEvent = item.__getattribute__('date')
+    oldEvent = newEvent
 
 
 message = 'Здравствуйте! Мы компания, которая предоставляет услуги в сфере фулфилмента. Мы предложим Вам самую лучшую ' \
@@ -89,6 +131,7 @@ message = 'Здравствуйте! Мы компания, которая пр�
           'Если Вы дадите обратную связь в течение 3-х дней, мы предоставим Вам дополнительную СКИДКУ в размере 10%. ' \
           'Спасибо за внимание! '
 driver = webdriver.Chrome(service=Service("C:\\Users\\Alex\\Downloads\\chromedriver.exe"))
+driver.implicitly_wait(10)
 driver.maximize_window()
 
 window = tk.Tk()
