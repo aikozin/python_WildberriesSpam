@@ -3,7 +3,6 @@ import time
 import tkinter as tk
 
 import requests
-from selenium.webdriver import Keys
 from seleniumwire import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -42,7 +41,6 @@ def asyncUpdateCategoryInfo():
                 try:
                     txtEdit.insert(tk.END, f'Открыта страница "{catalogTitle}" в категории "{nameCategory}" \n')
                     txtEdit.insert(tk.END, f'В категории найдено {newCountBrands} брендов \n\n')
-                    txtEdit.insert(tk.END, userAgent)
                 except Exception:
                     txtEdit.insert(tk.END, 'Ошибка: Не удалось получить информацию о выбранной категории \n')
         except:
@@ -62,34 +60,45 @@ def start():
 def asyncSendMessages():
     global oldEvent
     global newEvent
-    brand = driver.find_element(By.XPATH, '//*[@id="filters"]/div[2]/div[2]/fieldset/label[1]')
+    brand = driver.find_element(By.XPATH, '//*[@id="filters"]/*[@data-filter-name="fbrand"]/div[2]/fieldset/label[1]')
     for i in range(0, len(requestsJson)):
-        txtEdit.insert(tk.END, f'Бренд {i + 1} из {len(requestsJson)}')
+        txtEdit.insert(tk.END, f'Бренд {i + 1} из {len(requestsJson)} : ')
         txtEdit.insert(tk.END, f'Пишем бренду {requestsJson[i]["name"]}... ')
         driver.execute_script("arguments[0].setAttribute('data-value', '" + str(requestsJson[i]['id']) + "')", brand)
         driver.execute_script("arguments[0].textContent='" + requestsJson[i]['name'] + "'", brand)
         brand.click()
         waitEvent()
 
-        driver.execute_script('window.open("' + driver.find_element(By.XPATH, '//div[@class="product-card-list"]/div[1]/div/a').get_attribute('href') + '#Comments' + '", "new_window")')
+        driver.execute_script('window.open("' + driver.find_element(By.XPATH, '//div[@class="product-card-list"]/div[1]/div/a').get_attribute('href') + '", "new_window")')
         waitEvent()
         driver.switch_to.window(driver.window_handles[1])
-        driver.find_element(By.XPATH, '//*[@id="a-Questions"]').click()
-        time.sleep(0.5)
-        driver.find_element(By.XPATH, '//*[@id="new-question"]').click()
-        driver.find_element(By.XPATH, '//*[@id="new-question"]').send_keys(message)
-        time.sleep(1)
-        driver.find_element(By.XPATH, '//*[@id="addComment"]').click()
 
-        # нажатие на "Отправить"
-        popups = ''
-        while popups.find('Спасибо за Ваш вопрос') == -1:
-            popups = driver.find_elements(By.XPATH, '//h2[@class="popup__header"]')
+        try:
+            imtId = ''
+            for item in driver.requests:
+                if 'catalog' in item.url:
+                    try:
+                        jsonObject = json.loads(item.response.body)
+                        imtId = jsonObject['data']['products'][0]['root']
+                    except:
+                        pass
+            url = 'https://questions.wildberries.ru/api/v1/question'
+            headers = {
+                'User-Agent': userAgent,
+                'authorization': 'Bearer ' + 'eyJhbGciOiJSUzI1NiIsImtpZCI6IlpkZUJNOG5xb0RCd3N4RkdnMjM5a1N4N1pZY2xncTZNWjVPSXVVRGdiSXciLCJ0eXAiOiJKV1QifQ.eyJleHAiOjE2NDk4NzMyMjEsImlhdCI6MTY0OTc4NjgyMSwicm9sZXMiOlsidXNlciJdLCJ1c2VyX2lkIjo1Mzk4NTM2N30.AUcxXvejd8J9WemfrucYKno0lO-fbYfKwPNgpbl4K06q_auvzIwaZy_HRhgrfpUhglHbllKGMj9oKsb_uwOIzdxpgE9_DxiMHOZVh4MYL69UKxx31W2bObFFmvZeC_i-1tSRMszsxQFWUM9eASj1jxW59UwF13dMZAH9y7jBRbijOncr2ZagL47b4gTqjlRN1Dg_inAGyDCtqKfAqDD0ZdmcSWaeP0RzkYQdnJH8b3Uqv62ICmIyiSkYROlFIhkXmP8T55KNVBDTYa_9rmpIbBOYjD3enUnuXYQArjnY5EhUDH5r0oaeaJ7Z-wvlbgvGvHEkkh-ZH6dceAaNEUpvkA'}
+            response = requests.post(url,
+                                     headers=headers,
+                                     json={'imtId': imtId, 'text': message})
+            if response.status_code == 200:
+                txtEdit.insert(tk.END, 'Успешно \n')
+            else:
+                txtEdit.insert(tk.END, 'Непредвиденная ошибка \n')
+        except:
+            pass
 
         driver.close()
         driver.switch_to.window(driver.window_handles[0])
 
-        txtEdit.insert(tk.END, 'Готово \n')
         brand.click()
         waitEvent()
 
@@ -104,16 +113,7 @@ def send():
         if 'https://www.wildberries.ru/stats/events' in item.url:
             oldEvent = item.__getattribute__('date')
     newEvent = oldEvent
-    # thread2 = threading.Thread(target=asyncSendMessages).start()
-
-    url = 'https://questions.wildberries.ru/api/v1/question'
-    headers = {
-        'User-Agent': userAgent,
-        'authorization': 'Bearer ' + 'eyJhbGciOiJSUzI1NiIsImtpZCI6IlpkZUJNOG5xb0RCd3N4RkdnMjM5a1N4N1pZY2xncTZNWjVPSXVVRGdiSXciLCJ0eXAiOiJKV1QifQ.eyJleHAiOjE2NDk4NzMyMjEsImlhdCI6MTY0OTc4NjgyMSwicm9sZXMiOlsidXNlciJdLCJ1c2VyX2lkIjo1Mzk4NTM2N30.AUcxXvejd8J9WemfrucYKno0lO-fbYfKwPNgpbl4K06q_auvzIwaZy_HRhgrfpUhglHbllKGMj9oKsb_uwOIzdxpgE9_DxiMHOZVh4MYL69UKxx31W2bObFFmvZeC_i-1tSRMszsxQFWUM9eASj1jxW59UwF13dMZAH9y7jBRbijOncr2ZagL47b4gTqjlRN1Dg_inAGyDCtqKfAqDD0ZdmcSWaeP0RzkYQdnJH8b3Uqv62ICmIyiSkYROlFIhkXmP8T55KNVBDTYa_9rmpIbBOYjD3enUnuXYQArjnY5EhUDH5r0oaeaJ7Z-wvlbgvGvHEkkh-ZH6dceAaNEUpvkA'}
-    response = requests.post(url,
-                             headers=headers,
-                             json={'imtId':40651286,'text':message,'goodsName':'Смартфон iPhone 11 64GB (новая комплектация)'})
-    txtEdit.insert(tk.END, response.status_code)
+    thread2 = threading.Thread(target=asyncSendMessages).start()
 
 
 def waitEvent():
